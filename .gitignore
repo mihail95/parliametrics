@@ -1,0 +1,43 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg
+*.egg-info/
+.env
+.env.*
+
+# Virtual environments
+.venv/
+venv/
+
+# Node (frontend)
+node_modules/
+dist/
+frontend/node_modules/
+frontend/dist/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+*.out
+
+# DB files (if you store any)
+*.sqlite3
+*.db
+
+# Docker
+**/__pycache__/
+docker-compose.override.yml
+*.pid
+
+# DBeaver config (if local files get created)
+.dbeaver-data-sources.json
+
+# Optional: VSCode settings
+.vscode/
+
+# Postgres volumes (if used locally)
+pgdata/
