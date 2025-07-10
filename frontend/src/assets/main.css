@@ -1,5 +1,6 @@
 @import './base.css';
 
+/* App container */
 #app {
   max-width: 1280px;
   margin: 0 auto;
@@ -7,6 +8,7 @@
   font-weight: normal;
 }
 
+/* Link styles */
 a,
 .green {
   text-decoration: none;
@@ -21,15 +23,7 @@ a,
   }
 }
 
+/* REMOVE the problematic flex and grid layout */
 @media (min-width: 1024px) {
-  body {
-    display: flex;
-    place-items: center;
-  }
-
-  #app {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    padding: 0 2rem;
-  }
+  /* Keep this empty or add custom spacing if needed */
 }

@@ -13,3 +13,10 @@ SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 def init_db():
     from models import Party, Speaker, Speech, SpeakerPartyAffiliation  # import all models here
     Base.metadata.create_all(bind=engine)
+
+def get_db():
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
