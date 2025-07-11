@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 from typing import List, Optional
-from datetime import datetime
+from datetime import date
 
 from db import get_db
 from models import Speech, Speaker, Party, SpeakerPartyAffiliation
@@ -15,15 +15,15 @@ def get_speeches(
     speaker_id: Optional[int] = Query(None),
     party_id: Optional[int] = Query(None),
     from_tribune: Optional[bool] = Query(None),
-    date_from: Optional[datetime] = Query(None),
-    date_to: Optional[datetime] = Query(None),
+    date_from: Optional[date] = Query(None),
+    date_to: Optional[date] = Query(None),
     skip: int = 0,
     limit: int = 20
 ):
     query = db.query(
         Speech.speech_id,
         Speech.speech_content,
-        Speech.timestamp,
+        Speech.datestamp,
         Speech.from_tribune,
         Speaker.speaker_name,
         Party.party_name,
@@ -39,20 +39,22 @@ def get_speeches(
     if from_tribune is not None:
         query = query.filter(Speech.from_tribune == from_tribune)
     if date_from:
-        query = query.filter(Speech.timestamp >= date_from)
+        query = query.filter(Speech.datestamp >= date_from)
     if date_to:
-        query = query.filter(Speech.timestamp <= date_to)
+        query = query.filter(Speech.datestamp <= date_to)
 
-    return query.order_by(Speech.timestamp.desc()).offset(skip).limit(limit).all()
+    return query.order_by(Speech.datestamp.desc()).offset(skip).limit(limit).all()
 
 
 @router.get("/speeches/filters", response_model=FilterOptionsOut)
 def get_filter_options(db: Session = Depends(get_db)):
-    speakers = db.query(Speaker.speaker_id, Speaker.speaker_name).order_by(Speaker.speaker_name).all()
+    speakers = db.query(Speaker.speaker_id, Speaker.speaker_name).order_by(Speaker.speaker_name).distinct().all()
     parties = db.query(Party.party_id, Party.party_name, Party.party_abbreviation).order_by(Party.party_name).all()
+    dates = db.query(Speech.datestamp).order_by(Speech.datestamp).distinct().all()
 
     return {
         "speakers": [{"id": s.speaker_id, "name": s.speaker_name} for s in speakers],
         "parties": [{"id": p.party_id, "name": p.party_name, "abbr": p.party_abbreviation} for p in parties],
-        "from_tribune_options": [True, False]
+        "from_tribune_options": [True, False],
+        "dates": [d.datestamp for d in dates]
     }

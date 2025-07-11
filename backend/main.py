@@ -9,10 +9,22 @@ app = FastAPI()
 
 app.include_router(router)
 
-# CORS settings – allow localhost:5173 during dev
+ENV = os.getenv("ENV", "development")
+
+# Configure allowed origins
+if ENV == "development":
+    allowed_origins = [
+        "http://localhost:5173",  # Vite dev
+        "http://localhost:3000",  # Docker dev frontend
+    ]
+else:
+    allowed_origins = [
+        "https://parliametrics.bg",  # Replace with your real prod domain
+    ]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173"],
+    allow_origins=allowed_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

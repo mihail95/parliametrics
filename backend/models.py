@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Text, Boolean, ForeignKey, DateTime, UniqueConstraint
+from sqlalchemy import Column, Integer, String, Text, Boolean, ForeignKey, Date, UniqueConstraint
 from sqlalchemy.orm import relationship, declarative_base
 import datetime
 
@@ -30,8 +30,8 @@ class SpeakerPartyAffiliation(Base):
     affiliation_id = Column(Integer, primary_key=True)
     speaker_speaker_id = Column(Integer, ForeignKey("speakers.speaker_id"))
     party_party_id = Column(Integer, ForeignKey("parties.party_id"))
-    start_date = Column(DateTime)
-    end_date = Column(DateTime, nullable=True)
+    start_date = Column(Date)
+    end_date = Column(Date, nullable=True)
 
     speaker = relationship("Speaker", back_populates="affiliations")
     party = relationship("Party", back_populates="affiliations")
@@ -43,7 +43,7 @@ class Speech(Base):
     speech_id = Column(Integer, primary_key=True)
     speech_content = Column(Text)
     from_tribune = Column(Boolean, default=True)
-    timestamp = Column(DateTime, default=datetime.datetime.utcnow)
+    datestamp = Column(Date, default=datetime.date.today)
 
     affiliation_id = Column(Integer, ForeignKey("affiliations.affiliation_id"))
     affiliation = relationship("SpeakerPartyAffiliation", back_populates="speeches")

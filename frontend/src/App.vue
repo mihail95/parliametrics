@@ -13,41 +13,69 @@ function collapseNavbar() {
     instance.toggle()
   }
 }
+
+import { useLanguageStore } from '@/stores/language'
+import { useTranslate } from '@/composables/useTranslate'
+
+const langStore = useLanguageStore()
+const t = useTranslate()
+
 </script>
 
 <template>
   <!-- Bootstrap navbar -->
-  <nav class="navbar navbar-expand-lg navbar-light bg-light fixed-top">
+  <nav class="navbar navbar-expand-lg navbar-light bg-light fixed-top shadow-sm">
     <div class="container-fluid">
-      <!-- Brand on the left -->
-      <RouterLink to="/" class="navbar-brand me-4" @click="collapseNavbar">Parliametrics</RouterLink>
+      <!-- Brand -->
+      <RouterLink class="navbar-brand" to="/" @click="collapseNavbar">Parliametrics</RouterLink>
+
+      <!-- Language selector (ALWAYS visible) -->
+      <div class="d-lg-none ms-auto me-2">
+        <select v-model="langStore.lang" class="form-select form-select-sm">
+          <option value="bg">Български</option>
+          <option value="en">English</option>
+        </select>
+      </div>
 
       <!-- Toggler -->
       <button
         class="navbar-toggler"
         type="button"
+        @click="collapseNavbar"
         aria-controls="navbarNav"
         aria-expanded="false"
         aria-label="Toggle navigation"
-        @click="collapseNavbar"
       >
         <span class="navbar-toggler-icon"></span>
       </button>
 
-      <!-- Collapsible nav content -->
+      <!-- Collapse nav content -->
       <div class="collapse navbar-collapse" id="navbarNav">
-        <!-- Left-side nav links -->
-        <ul class="navbar-nav me-auto mt-2 mt-lg-0">
-          <li class="nav-item mx-2">
-            <RouterLink to="/" class="nav-link" active-class="active" @click="collapseNavbar" exact>Home</RouterLink>
+        <ul class="navbar-nav me-auto mb-2 mb-lg-0">
+          <li class="nav-item me-3">
+            <RouterLink to="/" class="nav-link" active-class="active" exact @click="collapseNavbar">
+              {{ t('home') }}
+            </RouterLink>
           </li>
-          <li class="nav-item mx-2">
-            <RouterLink to="/speeches" class="nav-link" active-class="active" @click="collapseNavbar">Speeches</RouterLink>
+          <li class="nav-item me-3">
+            <RouterLink to="/speeches" class="nav-link" active-class="active" @click="collapseNavbar">
+              {{ t('speeches') }}
+            </RouterLink>
           </li>
-          <li class="nav-item mx-2">
-            <RouterLink to="/about" class="nav-link" active-class="active" @click="collapseNavbar">About</RouterLink>
+          <li class="nav-item me-3">
+            <RouterLink to="/about" class="nav-link" active-class="active" @click="collapseNavbar">
+              {{ t('about') }}
+            </RouterLink>
           </li>
         </ul>
+
+        <!-- Right-aligned language selector for desktop -->
+        <div class="d-none d-lg-block ms-auto">
+          <select v-model="langStore.lang" class="form-select form-select-sm w-auto">
+            <option value="bg">Български</option>
+            <option value="en">English</option>
+          </select>
+        </div>
       </div>
     </div>
   </nav>
