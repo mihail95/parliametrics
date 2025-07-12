@@ -150,5 +150,9 @@ export const translations = {
     footer_github: {
         bg: 'Виж в GitHub',
         en: 'View on GitHub'
+    },
+    search: {
+        bg: "Въведи име",
+        en: "Enter a name"
     }
 }

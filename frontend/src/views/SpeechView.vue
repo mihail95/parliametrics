@@ -93,6 +93,27 @@ onMounted(async () => {
 
   ready.value = true
 })
+
+const speakerSearch = ref('')
+const selectedSpeakerName = computed(() => {
+  if (!selectedSpeaker.value) return null
+  const match = filters.value.speakers.find(s => s.id === selectedSpeaker.value)
+  return match?.name ?? null
+})
+
+const filteredSpeakers = computed(() =>
+  filters.value.speakers.filter(s =>
+    s.name.toLowerCase().includes(speakerSearch.value.toLowerCase())
+  )
+)
+
+const duplicateSpeakerNames = computed(() => {
+  const nameCounts: Record<string, number> = {}
+  filters.value.speakers.forEach(s => {
+    nameCounts[s.name] = (nameCounts[s.name] || 0) + 1
+  })
+  return new Set(Object.entries(nameCounts).filter(([, count]) => count > 1).map(([name]) => name))
+})
 </script>
 
 <template>
@@ -102,11 +123,43 @@ onMounted(async () => {
     <!-- Filters -->
     <div class="row g-3 mb-4">
       <div class="col-md-3">
-        <label class="form-label" for="speakerSelect">{{ t('speaker') }}</label>
-        <select id="speakerSelect" class="form-select" v-model="selectedSpeaker">
-          <option :value="null">{{ t('all') }}</option>
-          <option v-for="s in filters.speakers" :key="s.id" :value="s.id">{{ s.name }}</option>
-        </select>
+        <label class="form-label">{{ t('speaker') }}</label>
+        <div class="dropdown">
+          <button
+            class="form-select text-start"
+            type="button"
+            data-bs-toggle="dropdown"
+            aria-expanded="false"
+          >
+            {{ selectedSpeakerName || t('all') }}
+          </button>
+          <ul class="dropdown-menu w-100 p-2" style="max-height: 300px; overflow-y: auto;">
+            <input
+              type="text"
+              class="form-control mb-2"
+              v-model="speakerSearch"
+              :placeholder="t('search') + '…'"
+            />
+            <li>
+              <a
+                class="dropdown-item"
+                href="#"
+                @click.prevent="selectedSpeaker = null"
+              >{{ t('all') }}</a>
+            </li>
+            <li v-for="s in filteredSpeakers" :key="s.id">
+              <a
+                class="dropdown-item"
+                href="#"
+                @click.prevent="selectedSpeaker = s.id"
+              >{{ s.name }}
+                <template v-if="duplicateSpeakerNames.has(s.name) && s.middle_name">
+                  {{ ' (' + s.middle_name + ')' }}
+                </template>
+              </a>
+            </li>
+          </ul>
+        </div>
       </div>
 
       <div class="col-md-3">
@@ -114,7 +167,7 @@ onMounted(async () => {
         <select id="partySelect" class="form-select" v-model="selectedParty">
           <option :value="null">{{ t('all') }}</option>
           <option v-for="p in filters.parties" :key="p.id" :value="p.id">
-            {{ p.abbr }} – {{ p.name }}
+            {{ p.name }} ({{ p.abbr }})
           </option>
         </select>
       </div>

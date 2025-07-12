@@ -48,12 +48,12 @@ def get_speeches(
 
 @router.get("/speeches/filters", response_model=FilterOptionsOut)
 def get_filter_options(db: Session = Depends(get_db)):
-    speakers = db.query(Speaker.speaker_id, Speaker.speaker_name).order_by(Speaker.speaker_name).distinct().all()
+    speakers = db.query(Speaker.speaker_id, Speaker.speaker_name, Speaker.middle_name).order_by(Speaker.speaker_name).distinct().all()
     parties = db.query(Party.party_id, Party.party_name, Party.party_abbreviation).order_by(Party.party_name).all()
     dates = db.query(Speech.datestamp).order_by(Speech.datestamp).distinct().all()
 
     return {
-        "speakers": [{"id": s.speaker_id, "name": s.speaker_name} for s in speakers],
+        "speakers": [{"id": s.speaker_id, "name": s.speaker_name, "middle_name": getattr(s, "middle_name", None)} for s in speakers],
         "parties": [{"id": p.party_id, "name": p.party_name, "abbr": p.party_abbreviation} for p in parties],
         "from_tribune_options": [True, False],
         "dates": [d.datestamp for d in dates]

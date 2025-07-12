@@ -13,6 +13,8 @@ services:
     environment:
       - ENV=${ENV}
       - DATABASE_URL=${DATABASE_URL}
+    networks:
+      - parliametrics-net
 
   worker:
     build:
@@ -27,6 +29,8 @@ services:
     environment:
       - DATABASE_URL=${DATABASE_URL}
       - PYTHONPATH=/backend
+    networks:
+      - parliametrics-net
 
   frontend-dev:
     build:
@@ -41,3 +45,9 @@ services:
       - NODE_ENV=${NODE_ENV}
     depends_on:
       - backend
+    networks:
+      - parliametrics-net
+      
+networks:
+  parliametrics-net:
+    external: true

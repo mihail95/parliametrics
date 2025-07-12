@@ -9,7 +9,7 @@ export interface Speech {
 }
 
 export interface FilterOptions {
-  speakers: { id: number; name: string }[]
+  speakers: { id: number; name: string; middle_name: string }[]
   parties: { id: number; name: string; abbr: string }[]
   from_tribune_options: boolean[]
   dates: string[]

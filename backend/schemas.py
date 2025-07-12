@@ -19,7 +19,7 @@ class SpeechOut(BaseModel):
 class SpeakerOption(BaseModel):
     id: int
     name: str
-
+    middle_name: str|None
 
 class PartyOption(BaseModel):
     id: int
