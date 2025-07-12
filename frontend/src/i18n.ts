@@ -154,5 +154,49 @@ export const translations = {
     search: {
         bg: "Въведи име",
         en: "Enter a name"
+    },
+    about_title: {
+        bg: 'За проекта',
+        en: 'About the Project',
+    },
+    about_intro: {
+        bg: 'Този уебсайт предоставя леснодостъпен начин за разглеждане и анализиране на изказванията в българския парламент.',
+        en: 'This website provides an accessible way to explore and analyze speeches from the Bulgarian Parliament.',
+    },
+    about_goal: {
+        bg: 'Целта му е да улесни достъпа до парламентарна информация и да насърчи прозрачността чрез интуитивен потребителски интерфейс.',
+        en: 'Its goal is to improve access to parliamentary information and promote transparency through an intuitive user interface.',
+    },
+    about_features: {
+        bg: 'Функционалностите включват филтриране по говорител, партия, дата и място на изказване, както и възможност за разглеждане на пълния текст.',
+        en: 'Features include filtering by speaker, party, date, and location, as well as viewing the full text of each speech.',
+    },
+    about_dataset: {
+        bg: 'Изказванията се извличат автоматично чрез публичния API на parliament.bg и се обогатяват с допълнителни езикови метрики.',
+        en: 'Speeches are automatically extracted from the public parliament.bg API and enriched with additional linguistic metrics.',
+    },
+    about_future: {
+        bg: 'Планирани са функции като пълнотекстово търсене, статистика на речта и визуализации.',
+        en: 'Planned features include full-text search, speech statistics, and visualizations.',
+    },
+    project_info: {
+        bg: 'Информация за проекта',
+        en: 'Project Information',
+    },
+    author: {
+        bg: 'Автор',
+        en: 'Author',
+    },
+    contact: {
+        bg: 'Контакт',
+        en: 'Contact',
+    },
+    frontend: {
+        bg: 'Потребителски интерфейс',
+        en: 'Frontend',
+    },
+    backend: {
+        bg: 'Сървърна част',
+        en: 'Backend',
     }
 }
