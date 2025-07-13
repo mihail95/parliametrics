@@ -13,6 +13,8 @@ def seed_speakers_and_affiliations():
     try:
         parties = db.query(Party).all()
         for party in parties:
+            if party.party_id == 0:
+                continue
             party_api_id = party.party_api_id
             current_year = date.today().year
             current_month = date.today().month
