@@ -6,8 +6,8 @@ export const useSpeechStore = defineStore('speech', {
         filters: null as FilterOptions | null,
         speeches: [] as Speech[],
         fetched: false,
-        selectedSpeaker: null as number | null,
-        selectedParty: null as number | null,
+        selectedSpeakers: [] as number[],
+        selectedParties: [] as number[],
         selectedLocation: null as boolean | null,
         dateFrom: null as string | null,
         dateTo: null as string | null,
@@ -27,18 +27,30 @@ export const useSpeechStore = defineStore('speech', {
             }
         },
         async fetchSpeeches(limit = 20) {
-            const params: Record<string, string> = {
-                skip: ((this.page - 1) * limit).toString(),
-                limit: limit.toString()
-            }
-            if (this.selectedSpeaker !== null) params.speaker_id = this.selectedSpeaker.toString()
-            if (this.selectedParty !== null) params.party_id = this.selectedParty.toString()
-            if (this.selectedLocation !== null) params.from_tribune = this.selectedLocation.toString()
-            if (this.dateFrom) params.date_from = this.dateFrom
-            if (this.dateTo) params.date_to = this.dateTo
-
             const url = new URL('http://localhost:8000/speeches')
-            url.search = new URLSearchParams(params).toString()
+            const params = new URLSearchParams()
+
+            params.set('skip', ((this.page - 1) * limit).toString())
+            params.set('limit', limit.toString())
+
+            // Add speaker_ids as multiple query params
+            if (this.selectedSpeakers.length > 0) {
+                this.selectedSpeakers.forEach(id => params.append('speaker_ids', id.toString()))
+            }
+
+            // Add party_ids as multiple query params
+            if (this.selectedParties.length > 0) {
+                this.selectedParties.forEach(id => params.append('party_ids', id.toString()))
+            }
+
+            if (this.selectedLocation !== null) {
+                params.set('from_tribune', this.selectedLocation.toString())
+            }
+            if (this.dateFrom) params.set('date_from', this.dateFrom)
+            if (this.dateTo) params.set('date_to', this.dateTo)
+
+            url.search = params.toString()
+
             const res = await fetch(url.toString())
             if (!res.ok) throw new Error('Failed to fetch speeches')
             this.speeches = await res.json()

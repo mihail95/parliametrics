@@ -198,5 +198,21 @@ export const translations = {
     backend: {
         bg: 'Сървърна част',
         en: 'Backend',
+    },
+    selected: {
+        bg: 'Избрани',
+        en: 'Selected'
+    },
+    apply_filters: {
+        bg: 'Филтрирай',
+        en: 'Apply filters'
+    },
+    clear_filters: {
+        en: 'Clear filters',
+        bg: 'Изчисти филтрите',
+    },
+    no_filters_to_clear : {
+        en: 'No filters to clear',
+        bg: 'Няма филтри за изчистване',
     }
 }

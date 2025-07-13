@@ -12,8 +12,8 @@ router = APIRouter()
 @router.get("/speeches", response_model=List[SpeechOut])
 def get_speeches(
     db: Session = Depends(get_db),
-    speaker_id: Optional[int] = Query(None),
-    party_id: Optional[int] = Query(None),
+    speaker_ids: Optional[List[int]] = Query(None),
+    party_ids: Optional[List[int]] = Query(None),
     from_tribune: Optional[bool] = Query(None),
     date_from: Optional[date] = Query(None),
     date_to: Optional[date] = Query(None),
@@ -32,10 +32,10 @@ def get_speeches(
     ).join(Speaker, SpeakerPartyAffiliation.speaker_speaker_id == Speaker.speaker_id
     ).join(Party, SpeakerPartyAffiliation.party_party_id == Party.party_id)
 
-    if speaker_id:
-        query = query.filter(Speaker.speaker_id == speaker_id)
-    if party_id:
-        query = query.filter(Party.party_id == party_id)
+    if speaker_ids:
+        query = query.filter(Speaker.speaker_id.in_(speaker_ids))
+    if party_ids:
+        query = query.filter(Party.party_id.in_(party_ids))
     if from_tribune is not None:
         query = query.filter(Speech.from_tribune == from_tribune)
     if date_from:
