@@ -56,6 +56,7 @@ class Speech(Base):
     speech_content = Column(Text)
     from_tribune = Column(Boolean, default=True)
     datestamp = Column(Date, default=datetime.date.today)
+    processed = Column(Boolean, default=False)
 
     affiliation_id = Column(Integer, ForeignKey("affiliations.affiliation_id"))
     affiliation = relationship("SpeakerPartyAffiliation", back_populates="speeches")

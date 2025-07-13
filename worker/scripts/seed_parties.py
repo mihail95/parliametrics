@@ -46,6 +46,8 @@ def seed_parties():
             recently_added = name in added_parties
             if exists or recently_added:
                 print(f"⚠️  Already exists: {name}")
+                if exists and party_api_id != exists.party_api_id:
+                    exists.party_api_id = party_api_id
                 continue
 
             party = Party(party_name=name, party_abbreviation=abbreviation, party_api_id=party_api_id)

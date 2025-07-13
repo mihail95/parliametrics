@@ -3,6 +3,7 @@ from sqlalchemy.exc import SQLAlchemyError
 from db import SessionLocal
 import requests
 from datetime import datetime
+from datetime import date
 
 def seed_speakers_and_affiliations():
     headers = {
@@ -13,7 +14,10 @@ def seed_speakers_and_affiliations():
         parties = db.query(Party).all()
         for party in parties:
             party_api_id = party.party_api_id
-            url = f"https://www.parliament.bg/api/v1/coll-list-mp/bg/{party_api_id}/2"
+            current_year = date.today().year
+            current_month = date.today().month
+            
+            url = f"https://www.parliament.bg/api/v1/coll-list-mp/bg/{party_api_id}/2?date={current_year}-{'{:02d}'.format(current_month)}-01"
             res = requests.get(url, headers=headers)
             if not res.ok:
                 print(f"❌ Failed to fetch party {party.party_name}")
@@ -65,6 +69,7 @@ def seed_speakers_and_affiliations():
                         end_date=end_date
                     )
                     db.add(affiliation)
+                    db.flush()
                     print(f"✅ Added: {speaker.full_name} → {party.party_name}")
                 else:
                     print(f"⚠️ Already exists: {speaker.full_name} → {party.party_name}")
