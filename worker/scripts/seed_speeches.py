@@ -3,18 +3,37 @@ from sqlalchemy import func
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import joinedload
 from db import SessionLocal
+from rapidfuzz import process, fuzz
 from typing import List, Tuple, Optional
 from datetime import datetime
 from datetime import date
 from collections import defaultdict
+from collections import deque
 import requests
 import re
 import sys
 import unicodedata
-from rapidfuzz import process, fuzz
 import traceback
 import time
 
+class SlidingAffiliationCache:
+    def __init__(self, max_age=4):
+        self._store = {}
+        self._history = deque(maxlen=max_age)
+
+    def add(self, norm_speaker, affiliation):
+        self._store[norm_speaker] = affiliation
+        self._history.append(norm_speaker)
+        # Retain only recent speakers
+        recent = set(self._history)
+        self._store = {k: v for k, v in self._store.items() if k in recent}
+
+    def get(self, norm_speaker):
+        return self._store.get(norm_speaker)
+
+    def __contains__(self, norm_speaker):
+        return norm_speaker in self._store
+    
 # Lowercased and normalized non-speaker labels (full or prefix-based)
 NON_SPEAKER_PREFIXES = [
     "реплика", "реплики", "декларира", "декларация", "първо гласуване на", "второ гласуване на", "трето гласуване на",
@@ -80,8 +99,7 @@ def extract_and_insert_speeches_from_api(
         speaker_names = list(speaker_lookup.keys())
         party_names = list(party_lookup.keys()) + list(abbrev_lookup.keys())
 
-        # ✅ Cache for last-used affiliation per speaker
-        speaker_affiliation_cache: dict[str, SpeakerPartyAffiliation] = {}
+        speaker_affiliation_cache = SlidingAffiliationCache(max_age=4)
 
         for year_data in seatings.values():
             for month_data in year_data.values():
@@ -100,57 +118,46 @@ def extract_and_insert_speeches_from_api(
 
                     speeches = re.findall(
                         r"^([А-Я\s]+)(\(.*\))*:([\S\s]*?)(?=^([А-Я\s]+)(\(.*\))*:|\Z)",
-                        steno_text,
-                        re.M
+                        steno_text, re.M
                     )
 
+                    last_successful_speech = None
                     for raw_speaker, annotation, content, *_ in speeches:
-                        # Skip invalid lines that look like speaker names but aren't
-                        if is_likely_not_speaker(raw_speaker):
-                            print(f"⚠️ Skipping invalid speaker line: {raw_speaker}")
-                            continue
                         try:
-                            content_clean = re.sub(r"<br\s*/?>", "\n", content, flags=re.IGNORECASE).strip()
-                            content_clean = re.sub(r"\n+", "\n", content_clean)
-                            content_clean = content_clean.strip()
+                            content_clean = re.sub(r"<br\s*/?>", "\n", content, flags=re.IGNORECASE)
+                            content_clean = re.sub(r"\n+", "\n", content_clean).strip()
+
+                            if is_likely_not_speaker(raw_speaker):
+                                print(f"⚠️ Skipping invalid speaker line: {raw_speaker}")
+                                if last_successful_speech:
+                                    last_successful_speech.speech_content += "\n" + content_clean
+                                    db.flush()
+                                continue
+
                             norm_speaker = normalize(raw_speaker)
-                            from_tribune = True
+                            from_tribune = not annotation or "от място" not in annotation
                             is_continuation = False
-                            party = None
                             speaker = None
                             affiliation = None
-                            
-                            # Try to extract party from annotation
+
+                            # --- Party resolution ---
+                            party = None
                             if annotation:
-                                party_match = re.search(r"^\(([^(),]+)", annotation)
-                                if party_match:
-                                    raw_party = normalize(party_match.group(1))
-                                    party = (
-                                        party_lookup.get(raw_party)
-                                        or abbrev_lookup.get(raw_party)
-                                    )
+                                match = re.search(r"^\(([^(),]+)", annotation)
+                                if match:
+                                    raw_party = normalize(match.group(1))
+                                    party = party_lookup.get(raw_party) or abbrev_lookup.get(raw_party)
+
                                     if not party:
-                                        # Try fuzzy full match
                                         fuzzy = fuzzy_match(raw_party, party_names)
                                         if fuzzy:
                                             party = party_lookup.get(fuzzy) or abbrev_lookup.get(fuzzy)
-
-                                        # Try partial fuzzy match if still not found
                                         if not party:
-                                            best_score = 0
-                                            best_match = None
-                                            for name in party_names:
-                                                score = fuzz.partial_ratio(raw_party, name)
-                                                if score > best_score and score >= 80:  # you can adjust threshold
-                                                    best_score = score
-                                                    best_match = name
-                                            if best_match:
-                                                party = party_lookup.get(best_match) or abbrev_lookup.get(best_match)
+                                            best = max(party_names, key=lambda n: fuzz.partial_ratio(raw_party, n), default=None)
+                                            if best and fuzz.partial_ratio(raw_party, best) >= 80:
+                                                party = party_lookup.get(best) or abbrev_lookup.get(best)
 
-                                if "от място" in annotation:
-                                    from_tribune = False
-
-                            # Speaker resolution
+                            # --- Speaker resolution ---
                             candidates = speaker_lookup.get(norm_speaker)
                             if not candidates:
                                 match = fuzzy_match(norm_speaker, speaker_names)
@@ -160,164 +167,102 @@ def extract_and_insert_speeches_from_api(
                                 if len(candidates) == 1:
                                     speaker = candidates[0][0]
                                 elif party:
-                                    # 1. Strict match: party and valid date
-                                    matches = [
-                                        (s, start, end) for (s, pid, start, end) in candidates
-                                        if pid == party.party_id and
-                                        (start is None or start <= speech_date) and
-                                        (end is None or speech_date <= end)
-                                    ]
-                                    if len(matches) == 1:
-                                        speaker = matches[0][0]
+                                    exact = [c for c in candidates if c[1] == party.party_id and (c[2] is None or c[2] <= speech_date) and (c[3] is None or speech_date <= c[3])]
+                                    if len(exact) == 1:
+                                        speaker = exact[0][0]
                                     else:
-                                        # 2. Relaxed: valid date, any party
-                                        time_valid = [
-                                            (s, start) for (s, _, start, end) in candidates
-                                            if (start is None or start <= speech_date) and
-                                            (end is None or speech_date <= end)
-                                        ]
-                                        if len(time_valid) == 1:
-                                            speaker = time_valid[0][0]
-                                            print(f"⚠️ Party mismatch; using time-valid fallback for '{raw_speaker}' on {speech_date}")
+                                        valid = [c for c in candidates if (c[2] is None or c[2] <= speech_date) and (c[3] is None or speech_date <= c[3])]
+                                        if len(valid) == 1:
+                                            speaker = valid[0][0]
                                         else:
-                                            # 3. Fallback: most recent affiliation
-                                            sorted_candidates = sorted(
-                                                candidates,
-                                                key=lambda x: x[2] or date.min,  # sort by start date
-                                                reverse=True
-                                            )
-                                            speaker = sorted_candidates[0][0]
-                                            print(f"⚠️ Using latest affiliation fallback for '{raw_speaker}' on {speech_date}'")
+                                            speaker = sorted(candidates, key=lambda c: c[2] or date.min, reverse=True)[0][0]
 
-                            # 1. If no party is given but speaker is known and cached
+                            # --- Affiliation logic ---
                             if not annotation and norm_speaker in speaker_affiliation_cache:
-                                affiliation = speaker_affiliation_cache[norm_speaker]
+                                affiliation = speaker_affiliation_cache.get(norm_speaker)
                                 is_continuation = True
 
-                            # 2. Regular affiliation match
                             if not affiliation and speaker and party:
-                                affiliation = next(
-                                    (a for a in affiliations
-                                    if a.speaker_speaker_id == speaker.speaker_id and
-                                        a.party_party_id == party.party_id),
-                                    None
-                                )
+                                affiliation = next((a for a in affiliations if a.speaker_speaker_id == speaker.speaker_id and a.party_party_id == party.party_id), None)
 
-                            # 3. Fallback for ПРЕДСЕДАТЕЛ
-                            if not affiliation and fuzz.partial_ratio("председател", norm_speaker) >= 85:
-                                affiliation = next(
-                                    (a for a in affiliations
-                                    if a.speaker_speaker_id == 1 and a.party_party_id == 1),
-                                    None
-                                )
-                                if affiliation:
-                                    print(f"⚠️ Using fallback affiliation for ПРЕДСЕДАТЕЛ on {speech_date}")
-
-                            # 4. Fallback for МИНИСТЪР
-                            if not affiliation and fuzz.partial_ratio("министър", norm_speaker) >= 85:
-                                affiliation = next(
-                                    (a for a in affiliations
-                                    if a.speaker_speaker_id == 2 and a.party_party_id == 2),
-                                    None
-                                )
-                                if affiliation:
-                                    print(f"⚠️ Using fallback affiliation for МИНИСТЪР on {speech_date}")
-
-                            # 5. Fallback for ДОКЛАДЧИК
-                            if not affiliation and fuzz.partial_ratio("докладчик", norm_speaker) >= 85:
-                                affiliation = next(
-                                    (a for a in affiliations
-                                    if a.speaker_speaker_id == 3 and a.party_party_id == 3),
-                                    None
-                                )
-                                if affiliation:
-                                    print(f"⚠️ Using fallback affiliation for ДОКЛАДЧИК on {speech_date}")
-
-                            # 6. FINAL fallback: use speaker’s most recent affiliation (if available)
-                            if not affiliation and speaker:
-                                affs = [
-                                    a for a in affiliations
-                                    if a.speaker_speaker_id == speaker.speaker_id
+                            if not affiliation:
+                                special_roles = [
+                                    ("председател", 1, 1),
+                                    ("министър", 2, 2),
+                                    ("докладчик", 3, 3),
                                 ]
+                                for keyword, sid, pid in special_roles:
+                                    if fuzz.partial_ratio(keyword, norm_speaker) >= 85:
+                                        affiliation = next((a for a in affiliations if a.speaker_speaker_id == sid and a.party_party_id == pid), None)
+                                        if affiliation:
+                                            break
+
+                            if not affiliation and speaker:
+                                affs = [a for a in affiliations if a.speaker_speaker_id == speaker.speaker_id]
                                 if affs:
-                                    affiliation = sorted(
-                                        affs,
-                                        key=lambda a: a.start_date or date.min,
-                                        reverse=True
-                                    )[0]
-                                    party_name = next((p.party_name for p in parties if p.party_id == affiliation.party_party_id), f"ID={affiliation.party_party_id}")
-                                    print(f"⚠️ Using latest affiliation fallback for '{raw_speaker}' → {party_name} on {speech_date}")
-                            
-                            # 7. Fallback for unknown/external speakers
-                            if not affiliation and not speaker:
-                                # Insert new Speaker (if not found)
-                                speaker = Speaker(
-                                    speaker_name=raw_speaker.strip().title(),
-                                    first_name="",
-                                    middle_name="",
-                                    last_name=""
-                                )
-                                db.add(speaker)
+                                    affiliation = sorted(affs, key=lambda a: a.start_date or date.min, reverse=True)[0]
+
+                            if not affiliation:
+                                normalized_name = raw_speaker.strip().title()
+                                speaker = db.query(Speaker).filter_by(speaker_name=normalized_name).first()
+                                speaker = db.query(Speaker).filter_by(speaker_name=normalized_name).first()
+                                if not speaker:
+                                    speaker = Speaker(
+                                        speaker_name=normalized_name,
+                                        first_name="", middle_name="", last_name=""
+                                    )
+                                speaker = db.merge(speaker)  # ✅ This ensures it's safely attached
                                 db.flush()
 
-                                # Check if "ВЪНШЕН" party is in local list
                                 fallback_party = next((p for p in parties if p.party_id == 9999), None)
                                 if not fallback_party:
-                                    fallback_party = Party(
-                                        party_id=9999,
-                                        party_name="ВЪНШЕН",
-                                        party_abbreviation="",
-                                        party_api_id=None
-                                    )
+                                    fallback_party = Party(party_id=9999, party_name="ВЪНШЕН", party_abbreviation="")
                                     db.add(fallback_party)
                                     db.flush()
-                                    parties.append(fallback_party)  # Update list for future lookups
+                                    parties.append(fallback_party)
                                     party_lookup[normalize(fallback_party.party_name)] = fallback_party
                                     abbrev_lookup[normalize(fallback_party.party_abbreviation)] = fallback_party
-                                    party_names.append(normalize(fallback_party.party_name))
-                                    party_names.append(normalize(fallback_party.party_abbreviation))
+                                    party_names += [normalize(fallback_party.party_name), normalize(fallback_party.party_abbreviation)]
 
-                                affiliation = SpeakerPartyAffiliation(
-                                    speaker=speaker,
-                                    party=fallback_party,
-                                    start_date=None,
-                                    end_date=None
-                                )
-                                db.add(affiliation)
-                                db.flush()
-                                affiliations.append(affiliation)  # Update list for future matching
+                                affiliation = db.query(SpeakerPartyAffiliation).filter_by(
+                                    speaker_speaker_id=speaker.speaker_id,
+                                    party_party_id=fallback_party.party_id
+                                ).first()
+                                if not affiliation:
+                                    speaker = db.merge(speaker)
+                                    fallback_party = db.merge(fallback_party)
+                                    affiliation = SpeakerPartyAffiliation(
+                                        speaker=speaker, party=fallback_party, start_date=None, end_date=None
+                                    )
+                                    db.add(affiliation)
+                                    db.flush()
+                                    affiliations.append(affiliation)
 
-                                print(f"⚠️ Assigned external fallback affiliation to '{raw_speaker}' on {speech_date}")
-
-                            # If still not found, raise error
                             if not affiliation:
-                                raise ValueError(
-                                    f"No affiliation for speaker='{raw_speaker}' and party='{annotation}'"
-                                )
+                                raise ValueError(f"No affiliation found for '{raw_speaker}' on {speech_date}")
 
-                            # ✅ Cache this speaker's affiliation for future fallback
-                            if speaker and affiliation:
-                                speaker_affiliation_cache[norm_speaker] = affiliation
+                            speaker_affiliation_cache.add(norm_speaker, affiliation)
 
-                            # Deduplication
                             existing = db.query(Speech).filter_by(
                                 datestamp=speech_date,
                                 affiliation_id=affiliation.affiliation_id,
                                 speech_content=content_clean
                             ).first()
                             if existing:
-                                print(f"⚠️ Skipping duplicate: {raw_speaker} on {speech_date}")
                                 continue
-
-                            db.add(Speech(
+                            
+                            affiliation = db.merge(affiliation)
+                            new_speech = Speech(
                                 speech_content=content_clean,
                                 from_tribune=from_tribune,
                                 datestamp=speech_date,
                                 is_continuation=is_continuation,
                                 processed=False,
                                 affiliation=affiliation
-                            ))
+                            )
+                            db.add(new_speech)
                             db.flush()
+                            last_successful_speech = new_speech
 
                         except Exception as e:
                             db.rollback()
@@ -334,8 +279,6 @@ def extract_and_insert_speeches_from_api(
         sys.exit(1)
     finally:
         db.close()
-
-
 
 def get_infos_from_parliament_db() -> Tuple[
     List[Party],

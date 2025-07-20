@@ -75,9 +75,12 @@ onMounted(async () => {
 function getSpeechPreview(text: string, maxLength = 50): string {
   return text.length > maxLength ? text.slice(0, maxLength) + '…' : text
 }
+
+const lastOpenedSpeechId = ref<number | null>(null)
 function openModal(speech: Speech) {
   selectedSpeech.value = speech
   showModal.value = true
+  lastOpenedSpeechId.value = speech.speech_id
 }
 function closeModal() {
   selectedSpeech.value = null
@@ -247,7 +250,7 @@ function handleKeydown(event: KeyboardEvent) {
           </tr>
         </thead>
         <tbody>
-          <tr v-for="speech in speeches" :key="speech.speech_id">
+          <tr v-for="speech in speeches" :key="speech.speech_id" :class="{ 'table-warning': speech.speech_id === lastOpenedSpeechId }">
             <td v-for="col in columns" :key="col.key">
               {{ col.formatter ? col.formatter(speech[col.key]) : speech[col.key] }}
             </td>
