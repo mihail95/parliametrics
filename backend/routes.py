@@ -43,7 +43,7 @@ def get_speeches(
     if date_to:
         query = query.filter(Speech.datestamp <= date_to)
 
-    return query.order_by(Speech.datestamp.desc()).offset(skip).limit(limit).all()
+    return query.order_by(Speech.datestamp.desc(), Speech.speech_id.asc()).offset(skip).limit(limit).all()
 
 
 @router.get("/speeches/filters", response_model=FilterOptionsOut)

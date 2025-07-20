@@ -87,7 +87,7 @@ function closeModal() {
 const columns: { key: keyof Speech; label: keyof typeof translations; formatter?: (val: any) => string }[] = [
   { key: 'datestamp', label: 'date' },
   { key: 'speaker_name', label: 'speaker' },
-  { key: 'party_name', label: 'party' },
+  { key: 'party_abbreviation', label: 'party' },
   {
     key: 'from_tribune',
     label: 'location',
@@ -116,6 +116,20 @@ const hasActiveFilters = computed(() => {
 
   return hasSpeakers || hasParties || hasLocation || hasDateFrom || hasDateTo
 })
+
+watch(() => showModal.value, (isOpen) => {
+  if (isOpen) {
+    window.addEventListener('keydown', handleKeydown)
+  } else {
+    window.removeEventListener('keydown', handleKeydown)
+  }
+})
+
+function handleKeydown(event: KeyboardEvent) {
+  if (event.key === 'Escape') {
+    closeModal()
+  }
+}
 </script>
 
 <template>
@@ -174,7 +188,7 @@ const hasActiveFilters = computed(() => {
                 <input class="form-check-input" type="checkbox" :id="'party_' + p.id" :value="p.id"
                   v-model="selectedParties" />
                 <label class="form-check-label" :for="'party_' + p.id">
-                  {{ p.name }} ({{ p.abbr }})
+                  {{ p.name }}{{ p.abbr !== '' ? ' (' + p.abbr + ')' : '' }}
                 </label>
               </div>
             </li>
@@ -277,7 +291,7 @@ const hasActiveFilters = computed(() => {
 
     <!-- Modal -->
     <div v-if="showModal && selectedSpeech" class="modal fade show d-block" tabindex="-1"
-      style="background: rgba(0,0,0,0.5)">
+      style="background: rgba(0,0,0,0.5)" @click.self="closeModal">
       <div class="modal-dialog modal-lg">
         <div class="modal-content">
           <div class="modal-header">
@@ -286,8 +300,9 @@ const hasActiveFilters = computed(() => {
           </div>
           <div class="modal-body">
             <p><strong>{{ t('speaker') }}:</strong> {{ selectedSpeech.speaker_name }}</p>
-            <p><strong>{{ t('party') }}:</strong> {{ selectedSpeech.party_name }} - {{ selectedSpeech.party_abbreviation
-              }}
+            <p>
+              <strong>{{ t('party') }}:</strong>
+              {{ selectedSpeech.party_name }}{{ selectedSpeech.party_abbreviation !== '' ? ' - ' + selectedSpeech.party_abbreviation : '' }}
             </p>
             <p><strong>{{ t('date') }}:</strong> {{ selectedSpeech.datestamp }}</p>
             <p><strong>{{ t('location') }}:</strong> {{ t(selectedSpeech.from_tribune ? 'tribune' : 'place') }}</p>

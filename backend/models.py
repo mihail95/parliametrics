@@ -8,7 +8,7 @@ Base = declarative_base()
 class Speaker(Base):
     __tablename__ = 'speakers'
     __table_args__ = (
-        UniqueConstraint('first_name', 'middle_name', 'last_name', name='uq_full_speaker_name'),
+        UniqueConstraint('speaker_name','first_name', 'middle_name', 'last_name', name='uq_full_speaker_name'),
     )
 
     speaker_id = Column(Integer, primary_key=True)
@@ -23,6 +23,9 @@ class Speaker(Base):
     def full_name(self):
         return f"{self.first_name} {self.middle_name} {self.last_name}"
 
+    def __repr__(self):
+        return f"Speaker(id={self.speaker_id}, name='{self.speaker_name}', middle name='{self.middle_name}')"
+
 class Party(Base):
     __tablename__ = 'parties'
 
@@ -32,6 +35,9 @@ class Party(Base):
     party_api_id = Column(String)
 
     affiliations = relationship("SpeakerPartyAffiliation", back_populates="party")
+
+    def __repr__(self):
+        return f"Party(id={self.party_id}, name='{self.party_name}', abbr='{self.party_abbreviation}')"
 
 class SpeakerPartyAffiliation(Base):
     __tablename__ = 'affiliations'
@@ -49,6 +55,9 @@ class SpeakerPartyAffiliation(Base):
     party = relationship("Party", back_populates="affiliations")
     speeches = relationship("Speech", back_populates="affiliation")
 
+    def __repr__(self):
+        return f"Affiliation(id={self.affiliation_id}, speaker_id={self.speaker_speaker_id}, party_id={self.party_party_id})"
+
 class Speech(Base):
     __tablename__ = 'speeches'
 
@@ -57,6 +66,7 @@ class Speech(Base):
     from_tribune = Column(Boolean, default=True)
     datestamp = Column(Date, default=datetime.date.today)
     processed = Column(Boolean, default=False)
+    is_continuation = Column(Boolean, default=False)
 
     affiliation_id = Column(Integer, ForeignKey("affiliations.affiliation_id"))
     affiliation = relationship("SpeakerPartyAffiliation", back_populates="speeches")

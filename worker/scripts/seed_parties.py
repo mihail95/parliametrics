@@ -17,7 +17,7 @@ known_abbreviations = {
     "Алианс за права и свободи": "АПС",
     "ПП МЕЧ": "МЕЧ",
     "ВЕЛИЧИЕ": "ВЕЛИЧИЕ",
-    "Нечленуващи в ПГ": "БезПГ"
+    "Нечленуващи в ПГ": "Без ПГ"
 }
 
 def seed_parties():
@@ -35,6 +35,29 @@ def seed_parties():
     added_parties = set()
 
     try:
+        # Add special roles manually with fixed IDs
+        special_roles = [
+            {"id": 0, "name": "ПРЕДСЕДАТЕЛ"},
+            {"id": 1, "name": "МИНИСТЪР"},
+            {"id": 2, "name": "ДОКЛАДЧИК"},
+        ]
+
+        for role in special_roles:
+            exists = db.query(Party).filter_by(party_name=role["name"]).first()
+            if not exists:
+                db.execute(
+                    Party.__table__.insert().values(
+                        party_name=role["name"],
+                        party_abbreviation='',  # Can change if needed
+                        party_api_id=None
+                    )
+                )
+                added += 1
+                print(f"➕ Added special role: {role['name']} (id={role['id']})")
+            else:
+                print(f"⚠️ Special role already exists: {role['name']}")
+
+        # Add API-based parties
         for item in data:
             raw_name = item["A_ns_CL_value"]
             party_api_id = item["A_ns_C_id"]
@@ -63,6 +86,8 @@ def seed_parties():
         print(f"❌ Database error: {e}")
     finally:
         db.close()
+
+
 
 if __name__ == "__main__":
     seed_parties()
